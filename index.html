@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azizbek Turg'unboyev Academy</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 15px; text-align: center; }
+        h2, h3 { color: #0088cc; margin-bottom: 15px; }
+        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 15px; }
+        button { background-color: #0088cc; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:active { background-color: #006699; }
+        .hidden { display: none !important; }
+        .btn-green { background-color: #28a745; }
+        .btn-red { background-color: #dc3545; }
+        .btn-gray { background-color: #6c757d; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 14px; }
+        th { background-color: #0088cc; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>Azizbek Turg'unboyev Academy</h2>
+
+    <!-- TIZIMGA KIRISH (PANEL TANLASH) -->
+    <div id="role-selection" class="card">
+        <h3>Tizimga kirish</h3>
+        <button type="button" id="btn-show-teacher">👨‍🏫 O'qituvchi Paneli</button>
+        <button type="button" id="btn-show-student">👨‍🎓 O'quvchi Paneli</button>
+    </div>
+
+    <!-- O'QITUVCHI TIZIMI -->
+    <div id="teacher-login" class="card hidden">
+        <h3>O'qituvchi Kirishi / Ro'yxat</h3>
+        <input type="text" id="t-fullname" placeholder="Ism va Familiya">
+        <select id="t-subject">
+            <option value="">Faningizni tanlang</option>
+            <option value="Matematika">Matematika</option>
+            <option value="Fizika">Fizika</option>
+            <option value="Ingliz tili">Ingliz tili</option>
+            <option value="Kimyo">Kimyo</option>
+            <option value="Biologiya">Biologiya</option>
+        </select>
+        <input type="text" id="t-login" placeholder="Login">
+        <input type="password" id="t-pass" placeholder="Parol">
+        <button type="button" id="btn-login-teacher">Kirish</button>
+        <button type="button" class="btn-gray btn-back">Orqaga</button>
+    </div>
+
+    <!-- O'QITUVCHI DASHBOARD -->
+    <div id="teacher-dashboard" class="card hidden">
+        <h3 id="teacher-info"></h3>
+        <hr>
+        <h4>Yangi O'quvchi Qo'shish</h4>
+        <input type="text" id="st-name" placeholder="O'quvchi Ism Familiyasi">
+        <input type="tel" id="st-phone" placeholder="Telefon raqami">
+        <button type="button" id="btn-add-student">O'quvchini Saqlash</button>
+
+        <hr>
+        <h4>Kunlik Davomat</h4>
+        <div id="student-list"></div>
+
+        <hr>
+        <h4>Vazifa Yuborish</h4>
+        <textarea id="task-text" placeholder="Bugungi vazifa..."></textarea>
+        <button type="button" id="btn-send-task">Vazifani Joylash</button>
+        
+        <button type="button" id="btn-logout-teacher" class="btn-red" style="margin-top:15px;">Chiqish</button>
+    </div>
+
+    <!-- O'QUVCHI TIZIMI -->
+    <div id="student-login" class="card hidden">
+        <h3>O'quvchi Kirishi</h3>
+        <input type="tel" id="s-phone" placeholder="Telefon raqamingiz">
+        <button type="button" id="btn-login-student">Tekshirish</button>
+        <button type="button" class="btn-gray btn-back">Orqaga</button>
+    </div>
+
+    <!-- O'QUVCHI DASHBOARD -->
+    <div id="student-dashboard" class="card hidden">
+        <h3 id="student-welcome"></h3>
+        <p><b>Fan:</b> <span id="student-subject"></span></p>
+        
+        <h4>Oylik Davomat</h4>
+        <table>
+            <thead>
+                <tr><th>Sana</th><th>Holat</th></tr>
+            </thead>
+            <tbody id="attendance-history"></tbody>
+        </table>
+
+        <h4>Vazifalar</h4>
+        <div id="homework-list"></div>
+        <button type="button" class="btn-gray btn-back" style="margin-top:15px;">Orqaga</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let teachersDB = JSON.parse(localStorage.getItem('teachersDB')) || [];
+        let studentsDB = JSON.parse(localStorage.getItem('studentsDB')) || [];
+        let attendanceDB = JSON.parse(localStorage.getItem('attendanceDB')) || [];
+        let homeworkDB = JSON.parse(localStorage.getItem('homeworkDB')) || [];
+        let currentTeacher = JSON.parse(localStorage.getItem('currentTeacher')) || null;
+
+        function hideAll() {
+            document.getElementById('role-selection').classList.add('hidden');
+            document.getElementById('teacher-login').classList.add('hidden');
+            document.getElementById('teacher-dashboard').classList.add('hidden');
+            document.getElementById('student-login').classList.add('hidden');
+            document.getElementById('student-dashboard').classList.add('hidden');
+        }
+
+        function showMain() {
+            hideAll();
+            document.getElementById('role-selection').classList.remove('hidden');
+        }
+
+        document.getElementById('btn-show-teacher').addEventListener('click', function() {
+            hideAll();
+            if (currentTeacher) {
+                openTeacherDashboard();
+            } else {
+                document.getElementById('teacher-login').classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('btn-show-student').addEventListener('click', function() {
+            hideAll();
+            document.getElementById('student-login').classList.remove('hidden');
+        });
+
+        document.querySelectorAll('.btn-back').forEach(btn => {
+            btn.addEventListener('click', showMain);
+        });
+
+        document.getElementById('btn-login-teacher').addEventListener('click', function() {
+            const login = document.getElementById('t-login').value.trim();
+            const pass = document.getElementById('t-pass').value.trim();
+            const fullname = document.getElementById('t-fullname').value.trim();
+            const subject = document.getElementById('t-subject').value;
+
+            if (!login || !pass) {
+                alert("Login va parolni kiriting!");
+                return;
+            }
+
+            let teacher = teachersDB.find(t => t.login === login && t.password === pass);
+
+            if (!teacher) {
+                if (!fullname || !subject) {
+                    alert("Birinchi marta kirishda Ism va Fanni tanlang!");
+                    return;
+                }
+                teacher = { fullname, subject, login, password: pass };
+                teachersDB.push(teacher);
+                localStorage.setItem('teachersDB', JSON.stringify(teachersDB));
+            }
+
+            currentTeacher = teacher;
+            localStorage.setItem('currentTeacher', JSON.stringify(currentTeacher));
+            openTeacherDashboard();
+        });
+
+        function openTeacherDashboard() {
+            hideAll();
+            document.getElementById('teacher-dashboard').classList.remove('hidden');
+            document.getElementById('teacher-info').innerText = "O'qituvchi: " + currentTeacher.fullname + "\nFan: " + currentTeacher.subject;
+            renderStudents();
+        }
+
+        document.getElementById('btn-logout-teacher').addEventListener('click', function() {
+            localStorage.removeItem('currentTeacher');
+            currentTeacher = null;
+            showMain();
+        });
+
+        document.getElementById('btn-add-student').addEventListener('click', function() {
+            const name = document.getElementById('st-name').value.trim();
+            const phone = document.getElementById('st-phone').value.trim();
+
+            if (name && phone) {
+                studentsDB.push({ name, phone, subject: currentTeacher.subject });
+                localStorage.setItem('studentsDB', JSON.stringify(studentsDB));
+                alert("O'quvchi saqlandi!");
+                document.getElementById('st-name').value = '';
+                document.getElementById('st-phone').value = '';
+                renderStudents();
+            } else {
+                alert("Ma'lumotlarni to'liq kiriting!");
+            }
+        });
+
+        function renderStudents() {
+            const list = document.getElementById('student-list');
+            list.innerHTML = '';
+            let myStudents = studentsDB.filter(s => s.subject === currentTeacher.subject);
+
+            if (myStudents.length === 0) {
+                list.innerHTML = '<p style="color:#888;">O\'quvchilar yo\'q</p>';
+                return;
+            }
+
+            myStudents.forEach((st) => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '10px';
+                div.style.padding = '10px';
+                div.style.border = '1px solid #ddd';
+                div.style.borderRadius = '8px';
+                div.innerHTML = '<b>' + st.name + '</b> (' + st.phone + ')<br>' +
+                    '<button type="button" class="btn-green" style="width:48%; display:inline-block; margin-top:5px;">✅ Keldi</button> ' +
+                    '<button type="button" class="btn-red" style="width:48%; display:inline-block; margin-top:5px;">❌ Kelmadi</button>';
+                
+                div.querySelectorAll('.btn-green')[0].onclick = function() { markAtt(st.phone, st.name, 'keldi'); };
+                div.querySelectorAll('.btn-red')[0].onclick = function() { markAtt(st.phone, st.name, 'kelmadi'); };
+                
+                list.appendChild(div);
+            });
+        }
+
+        function markAtt(phone, name, status) {
+            const date = new Date().toLocaleDateString();
+            attendanceDB.push({ phone, date, status });
+            localStorage.setItem('attendanceDB', JSON.stringify(attendanceDB));
+
+            tg.sendData(JSON.stringify({
+                action: 'attendance_notification',
+                full_name: name,
+                phone: phone,
+                status: status
+            }));
+            alert("Davomat saqlandi: " + status);
+        }
+
+        document.getElementById('btn-send-task').addEventListener('click', function() {
+            const task = document.getElementById('task-text').value.trim();
+            if (task) {
+                homeworkDB.push({ subject: currentTeacher.subject, task, date: new Date().toLocaleDateString() });
+                localStorage.setItem('homeworkDB', JSON.stringify(homeworkDB));
+                alert("Vazifa saqlandi!");
+                document.getElementById('task-text').value = '';
+            }
+        });
+
+        document.getElementById('btn-login-student').addEventListener('click', function() {
+            const phone = document.getElementById('s-phone').value.trim();
+            const student = studentsDB.find(s => s.phone === phone);
+
+            if (student) {
+                hideAll();
+                document.getElementById('student-dashboard').classList.remove('hidden');
+                document.getElementById('student-welcome').innerText = "Xush kelibsiz, " + student.name;
+                document.getElementById('student-subject').innerText = student.subject;
+
+                const attList = document.getElementById('attendance-history');
+                attList.innerHTML = '';
+                attendanceDB.filter(a => a.phone === phone).forEach(a => {
+                    attList.innerHTML += '<tr><td>' + a.date + '</td><td>' + (a.status === 'keldi' ? '✅ Keldi' : '❌ Kelmadi') + '</td></tr>';
+                });
+
+                const hwList = document.getElementById('homework-list');
+                hwList.innerHTML = '';
+                homeworkDB.filter(h => h.subject === student.subject).forEach(h => {
+                    hwList.innerHTML += '<p>📌 <b>' + h.date + ':</b> ' + h.task + '</p>';
+                });
+            } else {
+                alert("Raqam topilmadi!");
+            }
+        });
+    </script>
+</body>
+</html>
